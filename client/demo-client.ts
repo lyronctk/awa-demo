@@ -43,28 +43,90 @@ var rl = readline.createInterface({
     output: process.stdout,
 });
 let cursor: Location;
+cursor = PLAYER_SPAWN;
 
 const PLAYER = new Player(PLAYER_SYMBOL, signer.address);
 
-/*
- * Client's local belief on game state stored in Board object.
- */
-let b: Board;
+const BOARD_SIZE: number = 3;
+let board = createBoard();
 
-/*
- * Cache for terrain
- */
-const terrainUtils = new TerrainUtils();
+function createBoard(): Tile[][] {
+    let board: Tile[][] = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        board[r] = [];
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            if (r === cursor.r && c === cursor.c) {
+                board[r][c] = Tile.genOwned(PLAYER, { r, c }, 30, 0, 0, 0);
+            } else {
+                board[r][c] = Tile.mystery({ r, c });
+            }
+        }
+    }
+    return board;
+}
 
-/*
- * Whether player has been spawned in.
- */
-let isSpawned = false;
+function printBoard(board: Tile[][]): void {
+    console.log();
+    for (let r = 0; r < board.length; r++) {
+        let row = "";
+        for (let c = 0; c < board[r].length; c++) {
+            let tile = board[r][c];
+            if (tile.owner === PLAYER) {
+                row += `[${tile.resources}]`;
+            } else if (tile.owner === Tile.MYSTERY) {
+                row += "[?]";
+            }
+        }
+        console.log(row);
+    }
 
-/*
- * Last block when player requested an enclave signature. Player's cannot submit
- * more than one move in a block.
- */
-let clientLatestMoveBlock: number = 0;
+    let tilesJSON = [];
+    for (let r = 0; r < board.length; r++) {
+        for (let c = 0; c < board[r].length; c++) {
+            tilesJSON.push(board[r][c].toJSONRedact());
+        }
+    }
+    let boardJSON = { tiles: tilesJSON };
+    console.log(boardJSON);
+}
 
-console.log("player: ", PLAYER);
+function move(str: string) {
+    const move = MOVE_KEYS[str];
+    if (move) {
+        const oldTile = board[cursor.r][cursor.c];
+        const newTile = Tile.genOwned(
+            PLAYER,
+            { r: cursor.r + move[0], c: cursor.c + move[1] },
+            oldTile.resources - 1,
+            oldTile.cityId,
+            oldTile.latestUpdateInterval,
+            oldTile.tileType
+        );
+        board[cursor.r][cursor.c] = Tile.genOwned(
+            PLAYER,
+            cursor,
+            1,
+            oldTile.cityId,
+            oldTile.latestUpdateInterval,
+            oldTile.tileType
+        );
+        cursor = { r: cursor.r + move[0], c: cursor.c + move[1] };
+        board[cursor.r][cursor.c] = newTile;
+    }
+    printBoard(board);
+}
+
+printBoard(board);
+process.stdin.resume();
+process.stdin.on("data", (key) => {
+    // ESC
+    if (key.toString() === "\u001B") {
+        console.log("Exiting...");
+        process.exit();
+    }
+});
+await new Promise((resolve) => process.stdin.once("data", resolve));
+
+process.stdin.on("keypress", async (str, key) => {
+    move(key.name);
+});

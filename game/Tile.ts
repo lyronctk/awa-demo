@@ -102,6 +102,31 @@ export class Tile {
         };
     }
 
+    toJSONRedact(): object {
+        let ownerNumRepr;
+        switch (this.owner.symbol) {
+            case 'A':
+                ownerNumRepr = 1;
+                break;
+            case 'B':
+                ownerNumRepr = 2;
+                break;
+            case 'C':
+                ownerNumRepr = 3;
+                break;
+            case '?':
+                ownerNumRepr = -1;
+                break;
+        }
+
+        return {
+            owner: ownerNumRepr,
+            r: this.loc.r,
+            c: this.loc.c,
+            resources: this.resources
+        };
+    }
+
     /*
      * Return true if this Tile is not owned by any player.
      */
