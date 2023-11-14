@@ -47,8 +47,11 @@ cursor = PLAYER_SPAWN;
 
 const PLAYER = new Player(PLAYER_SYMBOL, signer.address);
 
+/*
+ * ========== DUMMY MOVE LOGIC ==========
+ */
 const BOARD_SIZE: number = 3;
-let board = createBoard();
+let board;
 
 function createBoard(): Tile[][] {
     let board: Tile[][] = [];
@@ -63,31 +66,6 @@ function createBoard(): Tile[][] {
         }
     }
     return board;
-}
-
-function printBoard(board: Tile[][]): void {
-    console.log();
-    for (let r = 0; r < board.length; r++) {
-        let row = "";
-        for (let c = 0; c < board[r].length; c++) {
-            let tile = board[r][c];
-            if (tile.owner === PLAYER) {
-                row += `[${tile.resources}]`;
-            } else if (tile.owner === Tile.MYSTERY) {
-                row += "[?]";
-            }
-        }
-        console.log(row);
-    }
-
-    let tilesJSON = [];
-    for (let r = 0; r < board.length; r++) {
-        for (let c = 0; c < board[r].length; c++) {
-            tilesJSON.push(board[r][c].toJSONRedact());
-        }
-    }
-    let boardJSON = { tiles: tilesJSON };
-    console.log(boardJSON);
 }
 
 function move(str: string) {
@@ -116,7 +94,6 @@ function move(str: string) {
     printBoard(board);
 }
 
-printBoard(board);
 process.stdin.resume();
 process.stdin.on("data", (key) => {
     // ESC
@@ -130,3 +107,58 @@ await new Promise((resolve) => process.stdin.once("data", resolve));
 process.stdin.on("keypress", async (str, key) => {
     move(key.name);
 });
+/*
+ * ========================================
+ */
+
+/*
+ * ========== SEND TO SOHAN'S RENDER-ONLY CLIENT ==========
+ */
+const LOCAL_ADDR: string = "127.0.0.1";
+const LOCAL_PORT: string = "8891";
+
+interface SohanToUsEvents {}
+
+interface UsToSohanEvents {
+    claimPlayer: (playerNumRepr: number) => void;
+    updateView: (tiles: object) => void;
+}
+
+const socket: Socket<SohanToUsEvents, UsToSohanEvents> = io(
+    `${LOCAL_ADDR}:${LOCAL_ADDR}`
+);
+
+function printBoard(board: Tile[][]): void {
+    console.log();
+    for (let r = 0; r < board.length; r++) {
+        let row = "";
+        for (let c = 0; c < board[r].length; c++) {
+            let tile = board[r][c];
+            if (tile.owner === PLAYER) {
+                row += `[${tile.resources}]`;
+            } else if (tile.owner === Tile.MYSTERY) {
+                row += "[?]";
+            }
+        }
+        console.log(row);
+    }
+
+    let tilesJSON = [];
+    for (let r = 0; r < board.length; r++) {
+        for (let c = 0; c < board[r].length; c++) {
+            tilesJSON.push(board[r][c].toJSONRedact());
+        }
+    }
+    let boardJSON = { tiles: tilesJSON };
+    socket.emit("updateView", boardJSON);
+}
+
+socket.on("connect", async () => {
+    console.log("== Connected to front-end");
+    board = createBoard();
+    printBoard(board);
+    socket.emit("claimPlayer", board[cursor.r][cursor.c].toJSONRedact().owner);
+});
+/*
+ * ========================================
+ */
